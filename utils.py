@@ -379,8 +379,9 @@ def align_notes_labels_audio(
             Level of details the result should keep. 
             Can take value between: ['compact', 'labels', 'extended']
                 Compact: only outputs labels aligned with timestamps
-                Labels details: outputs labels and additional label information aligned with timestamps
-                Extended: outputs merged notes and labels datasets with additional information, aligned with timestamps                
+                Labels: outputs labels and additional label information aligned with timestamps
+                Extended: outputs merged notes and labels datasets with additional information, aligned with
+                timestamps
             Defaults to 'compact'.
 
     Returns:
@@ -405,7 +406,7 @@ def align_notes_labels_audio(
         store_path = os.getcwd()
     if os.path.isdir(store_path):
         audio_fname, _ = os.path.splitext(os.path.basename(audio_path))
-        result_fname = audio_fname + '_aligned.csv'
+        result_fname = audio_fname + '_aligned.tsv'
         store_path = os.path.join(store_path, result_fname)
     # Prepare annotation format
     df_annotation = corpus_to_df_musical_time(notes_path)
