@@ -162,8 +162,9 @@ def parse_args():
     )
     parser.add_argument(
         '-m', '--mode',
-        help="Output format mode, to choose between ['compact', 'labels', 'extended', 'scofo']. default: ",
-        default='compact'
+        help="Output format mode, to choose between ['compact', 'labels', 'extended']. default: 'extended'",
+        choices=['compact', 'labels', 'extended'],
+        default='extended',
     )
     parser.add_argument(
         '-e', '--evaluate', help="Evaluate warping mode. default: False", action='store_true', default=False
