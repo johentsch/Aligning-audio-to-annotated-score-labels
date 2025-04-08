@@ -1,5 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
+"""This script (currently) processes notes TSV files that have been aligned using the aligner.py script
+and turns them into symbolic timelines in the sense of measure/beat grid.
+
+To be precise, it reads a notes TSV file extracted from a MuseScore using the ms3 parser, to which aligner.py has
+added a "start" column in real time, according to the chosen recording. This script discards the notes that do not
+fall on a downbeat, maintaining those positions where on or several notes fall on a downbeat.
+
+Degrees of freedom
+------------------
+
+* Downbeats are computed using a fairly standard inference of metrical beats based on measure-wise quarternote offsets
+  and the time signature in question (see :func:`onset2beat`). This could be adapted to other criteria.
+* Downbeats on which no note occurs are not included in the timeline and (probably) need to be filled in/guessed
+  (e.g., using a linear fill).
+* Several notes co-occurring on the same downbeat may have different timestamps (as inherent to the recording or as an
+    algorithmic artefact). There are several ways of inferring a definite position in these cases:
+
+    - average of the timestamps
+        - Gaussian
+    - linear fill between preceding and consequent downbeats
+        - linear fill but weighted by the timestamps
+"""
 
 import os, argparse
 from fractions import Fraction
