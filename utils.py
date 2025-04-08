@@ -520,12 +520,27 @@ def align_notes_labels_audio(
     
     # Store
     if store:
-        audio_fname, _ = os.path.splitext(os.path.basename(audio_path))
-        fname_if_dir = audio_fname + '_aligned.csv'
-        store_path = write_csv(result, store_path, fname_if_dir)
-        print(f"\nStored results to", store_path)
-    
+        store_and_report_result(result, store_path, audio_path, "_aligned.csv", "alignment result")
+
     return result
+
+
+def store_and_report_result(
+        df: pd.DataFrame,
+        store_path: str,
+        original_path: str,
+        suffix: str,
+        what: str
+) -> None:
+    fname_if_dir = make_filename_from_path(original_path, suffix)
+    store_path = write_csv(df, store_path, fname_if_dir)
+    print(f"\nStored {what} to {store_path!r}")
+
+
+def make_filename_from_path(path, suffix):
+    audio_fname, _ = os.path.splitext(os.path.basename(path))
+    fname_if_dir = audio_fname + suffix
+    return fname_if_dir
 
 
 def write_csv(
