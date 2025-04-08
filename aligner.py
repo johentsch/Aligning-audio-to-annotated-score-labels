@@ -7,7 +7,8 @@ import ms3.cli
 import pandas as pd
 from tqdm.auto import tqdm
 
-from utils import align_notes_labels_audio
+from make_timeline import aligned_notes2aligned_downbeats, aligned_beats2tilia_format, aligned_notes2tilia_format
+from utils import align_notes_labels_audio, store_and_report_result
 
 
 def batch_process(
@@ -17,7 +18,9 @@ def batch_process(
         verbose: bool = False,
         visualize: bool = False,
         evaluate: bool = False,
-        mode: Literal['compact', 'labels', 'extended'] = 'compact'
+        mode: Literal['compact', 'labels', 'extended'] = 'compact',
+        timeline: bool = False,
+        tilia: bool = False,
 ):
     """
 
@@ -59,7 +62,7 @@ def batch_process(
                 output_path = os.path.join(store_path, output_path)
         else:
             output_path = store_path
-        align_notes_labels_audio(
+        align_and_maybe_timeline(
             audio_path=row.audio,
             notes_path=row.notes,
             labels_path=None if not has_labels else row.labels,
@@ -68,8 +71,48 @@ def batch_process(
             verbose=verbose,
             visualize=visualize,
             evaluate=evaluate,
-            mode=mode
+            mode=mode,
+            timeline=timeline,
+            tilia=tilia
         )
+
+
+def align_and_maybe_timeline(
+        audio_path: Optional[str] = None,
+        notes_path: Optional[str] = None,
+        labels_path: Optional[str] = None,
+        store: bool = True,
+        store_path: Optional[str] = None,
+        verbose: bool = False,
+        visualize: bool = False,
+        evaluate: bool = False,
+        mode: Literal['compact', 'labels', 'extended'] = 'compact',
+        timeline: bool = False,
+        tilia: bool = False,
+):
+    aligned = align_notes_labels_audio(
+        audio_path=audio_path,
+        notes_path=notes_path,
+        labels_path=labels_path,
+        store=store,
+        store_path=store_path,
+        verbose=verbose,
+        visualize=visualize,
+        evaluate=evaluate,
+        mode=mode,
+    )
+    if timeline + tilia == 0: return
+    if timeline:
+        timeline = aligned_notes2aligned_downbeats(aligned)
+        store_and_report_result(timeline, store_path, audio_path, ".timeline.csv", "timeline")
+        if tilia:
+            tilia_format = aligned_beats2tilia_format(timeline)
+        else:
+            return  # make sure we get to the bottom only if tilia
+    if tilia:
+        tilia_format = aligned_notes2tilia_format(aligned)
+    store_and_report_result(tilia_format, store_path, audio_path, ".tilia.csv", "tilia format")
+
 
 def main(
         audio_path: Optional[str] = None,
@@ -81,7 +124,9 @@ def main(
         verbose: bool = False,
         visualize: bool = False,
         evaluate: bool = False,
-        mode: Literal['compact', 'labels', 'extended'] = 'compact'
+        mode: Literal['compact', 'labels', 'extended'] = 'compact',
+        timeline: bool = False,
+        tilia: bool = False,
 ):
     if csv_path:
         batch_process(
@@ -91,10 +136,12 @@ def main(
             verbose=verbose,
             visualize=visualize,
             evaluate=evaluate,
-            mode=mode
+            mode=mode,
+            timeline=timeline,
+            tilia=tilia
         )
     else:
-        align_notes_labels_audio(
+        align_and_maybe_timeline(
             audio_path=audio_path,
             notes_path=notes_path,
             labels_path=labels_path,
@@ -103,7 +150,9 @@ def main(
             verbose=verbose,
             visualize=visualize,
             evaluate=evaluate,
-            mode=mode
+            mode=mode,
+            timeline=timeline,
+            tilia=tilia
         )
 
 
@@ -168,6 +217,12 @@ def parse_args():
     parser.add_argument(
         '-e', '--evaluate', help="Evaluate warping mode. default: False", action='store_true', default=False
     )
+    parser.add_argument(
+        '-t', '--timeline', help="Output an additional .timeline.csv file. default: False", action='store_true'
+    )
+    parser.add_argument(
+        '-tla', '--tilia', help="Output an additional .tilia.csv file. default: False", action='store_true'
+    )
     args = parser.parse_args()
     if args.csv:
         if args.output:
@@ -195,7 +250,9 @@ def run():
         verbose=False,
         visualize=False,
         evaluate=args.evaluate,
-        mode=args.mode
+        mode=args.mode,
+        timeline=args.timeline,
+        tilia=args.tilia
     )
 
 if __name__ == '__main__':
