@@ -439,12 +439,6 @@ def align_notes_labels_audio(
         [https://github.com/meinardmueller/synctoolbox]
     
     """
-    if store_path is None:
-        store_path = os.getcwd()
-    if os.path.isdir(store_path):
-        audio_fname, _ = os.path.splitext(os.path.basename(audio_path))
-        result_fname = audio_fname + '_aligned.csv'
-        store_path = os.path.join(store_path, result_fname)
     # Prepare annotation format
     df_annotation = corpus_to_df_musical_time(notes_path)
     # Keep track of notes annotations and labels correspondances
@@ -526,8 +520,37 @@ def align_notes_labels_audio(
     
     # Store
     if store:
-        csv_args = dict(sep="\t") if store_path.endswith(".tsv") else {}
-        result.to_csv(store_path, index = False, **csv_args)
+        audio_fname, _ = os.path.splitext(os.path.basename(audio_path))
+        fname_if_dir = audio_fname + '_aligned.csv'
+        store_path = write_csv(result, store_path, fname_if_dir)
         print(f"\nStored results to", store_path)
     
     return result
+
+
+def write_csv(
+        df: pd.DataFrame,
+        store_path: Optional[str] = None,
+        fname_if_dir: Optional[str] = None
+) -> str:
+    """
+
+    Args:
+        df: DataFrame to be stored in CSV format.
+        store_path:
+            Where to store. If None, defaults to current working directory. If directory, ``fname_if_dir`` needs to be
+            defined; if filepath, ``fname_if_dir`` is ignored.
+        fname_if_dir:
+            File name (or relative filepath) to be combined with ``store_path``. If the extension is
+            ".tsv", output is written as tab-separated values, otherwise as comma-separated values.
+    Returns:
+        Returns
+    """
+    if store_path is None:
+        store_path = os.getcwd()
+    if os.path.isdir(store_path):
+        assert fname_if_dir is not None, f"If store_path is a directory, a filename need to be specified."
+        store_path = os.path.join(store_path, fname_if_dir)
+    csv_args = dict(sep="\t") if store_path.endswith(".tsv") else {}
+    df.to_csv(store_path, index=False, **csv_args)
+    return store_path
