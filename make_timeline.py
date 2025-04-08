@@ -146,11 +146,15 @@ def aligned_notes2aligned_downbeats(notes: pd.DataFrame) -> pd.DataFrame:
         "octave", "chord_id", "end"
     )
     keep_columns = [col for col in notes.columns if col not in drop_columns]
-    return notes.loc[downbeat_mask, keep_columns].drop_duplicates(subset=["mn_playthrough", "beat"])
+    mn_column = "mn_playthrough" if "mn_playthrough" in notes.columns else "mn"  # playthrough -> expanded repeats
+    return notes.loc[downbeat_mask, keep_columns].drop_duplicates(subset=[mn_column, "beat"])
 
 
 def aligned_beats2tilia_format(aligned_beats):
-    measure = aligned_beats.mn_playthrough.str.extract("^(\d+)", expand=False).astype("Int64")
+    if "mn_playthrough" in aligned_beats.columns:
+        measure = aligned_beats.mn_playthrough.str.extract("^(\d+)", expand=False).astype("Int64")
+    else:
+        measure = aligned_beats.mn
     result = pd.DataFrame(
         dict(
             time=aligned_beats.start,
