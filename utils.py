@@ -3,7 +3,7 @@
 """ This module contains the main audio-to-annotations functionality and helper functions."""
 import os
 import warnings
-from typing import Optional, Literal
+from typing import Optional, Literal, Tuple
 
 import librosa.display
 import ms3
@@ -378,7 +378,7 @@ def align_notes_labels_audio(
         visualize: bool = False,
         evaluate: bool = False,
         mode: Literal['compact', 'labels', 'extended'] = 'compact'
-        ):
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """This function performs the whole pipeline of aligning an audio recording of a piece and its
     corresponding labels annotations from DCML's Mozart sonatas corpus [1], using synctoolbox dynamic
     time warping (DTW) tools [2]. It takes as input the paths to the audio file, to the labels TSV file
@@ -422,8 +422,11 @@ def align_notes_labels_audio(
                 labels but those of one of the notes they co-occur with.
 
     Returns:
+        aligned_notes:
+            The first DataFrame always corresponds to the result of align_notes_labels_audio() without ``labels_path``
+            and with mode "extended".
         result: DataFrame object
-            Dataframe containing labels and their corresponding timestamps within the audio.
+            Dataframe containing aligned notes or labels, according to the parameters.
             
             
     References: 
@@ -495,25 +498,14 @@ def align_notes_labels_audio(
     # Evaluate matching score after warping
     if evaluate:
         _ = evaluate_matching(df_annotation, df_annotation_warped, verbose=True)
-    
-    # Align time-aligned annotations of notes with labels
-    result = df_annotation_warped
-    if df_annotation_extended is not None:
+
+    aligned_notes = get_original_notes_warped(notes_path, df_annotation_warped)
+    if df_annotation_extended is not None:  # there are labels to be aligned
         result = align_warped_notes_labels(df_annotation_warped, df_annotation_extended, mode)
     elif mode == 'compact':
-        result = result[['start', 'end', 'pitch']]
+        result = df_annotation_warped[['start', 'end', 'pitch']]
     elif mode == 'extended':
-        # Return notes and their temporal positions, and additional information from the notes dataset
-        notes_df = pd.read_csv(notes_path, sep='\t', dtype="string") # loading as nullable strings to not change any data
-
-        if "start" in notes_df.columns:
-            warnings.warn(
-                f"The notes TSV already came with a 'start' column, so the result has two of them. If you want to add "
-                f"alignments for several recordings to the same note tables, it is a good idea to rename the columns "
-                f"accordingly."
-            )
-        assert notes_df.midi.equals(df_annotation_warped.pitch.astype("string")), "MIDI values do not match"
-        result = pd.concat([notes_df, df_annotation_warped[['start', 'end']]], axis=1)
+        result = aligned_notes
     else:
         raise ValueError(f"'mode' parameter should bei either 'compact', 'labels' or 'extended', got {mode}")
 
@@ -521,7 +513,19 @@ def align_notes_labels_audio(
     # Store
     if store:
         store_and_report_result(result, store_path, audio_path, "_aligned.csv", "alignment result")
+    return aligned_notes, result
 
+
+def get_original_notes_warped(notes_path: str, df_annotation_warped: pd.DataFrame) -> pd.DataFrame:
+    notes_df = ms3.load_tsv(notes_path)
+    if "start" in notes_df.columns:
+        warnings.warn(
+            f"The notes TSV already came with a 'start' column, so the result has two of them. If you want to add "
+            f"alignments for several recordings to the same note tables, it is a good idea to rename the columns "
+            f"accordingly."
+        )
+    assert notes_df.midi.equals(df_annotation_warped.pitch), "MIDI values do not match"
+    result = pd.concat([notes_df, df_annotation_warped[['start', 'end']]], axis=1)
     return result
 
 

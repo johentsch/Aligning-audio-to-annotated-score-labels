@@ -90,7 +90,7 @@ def align_and_maybe_timeline(
         timeline: bool = False,
         tilia: bool = False,
 ):
-    aligned = align_notes_labels_audio(
+    aligned_notes, _ = align_notes_labels_audio(
         audio_path=audio_path,
         notes_path=notes_path,
         labels_path=labels_path,
@@ -102,16 +102,23 @@ def align_and_maybe_timeline(
         mode=mode,
     )
     if timeline + tilia == 0: return
+    if not store_path:
+        store_path = os.getcwd()
+    if os.path.isdir(store_path):
+        original_path = audio_path
+    else:
+        # store_path is a filepath and we will replace the suffix of the file
+        store_path, original_path = os.path.split(store_path)
     if timeline:
-        timeline = aligned_notes2aligned_downbeats(aligned)
-        store_and_report_result(timeline, store_path, audio_path, ".timeline.csv", "timeline")
+        timeline = aligned_notes2aligned_downbeats(aligned_notes)
+        store_and_report_result(timeline, store_path, original_path, ".timeline.csv", "timeline")
         if tilia:
             tilia_format = aligned_beats2tilia_format(timeline)
         else:
             return  # make sure we get to the bottom only if tilia
     if tilia:
-        tilia_format = aligned_notes2tilia_format(aligned)
-    store_and_report_result(tilia_format, store_path, audio_path, ".tilia.csv", "tilia format")
+        tilia_format = aligned_notes2tilia_format(aligned_notes)
+    store_and_report_result(tilia_format, store_path, original_path, ".tilia.csv", "tilia format")
 
 
 def main(
@@ -211,7 +218,8 @@ def parse_args():
     )
     parser.add_argument(
         '-m', '--mode',
-        help="Output format mode, to choose between ['compact', 'labels', 'extended', 'scofo']. default: ",
+        help="Output format mode, to choose between ['compact', 'labels', 'extended']. default: 'compact'",
+        choices=['compact', 'labels', 'extended'],
         default='compact'
     )
     parser.add_argument(
