@@ -23,7 +23,8 @@ Degrees of freedom
         - linear fill but weighted by the timestamps
 """
 
-import os, argparse
+import argparse
+import os
 from fractions import Fraction
 from functools import cache
 from typing import Optional, Literal, overload
@@ -128,8 +129,8 @@ def float_is_integer(f: float) -> bool:
         print(f"Unable to evaluate whether {f!r} is an integer.")
         return False
 
-def aligned_notes2aligned_downbeats(aligned_notes: str):
-    notes = ms3.load_tsv(aligned_notes)
+
+def aligned_notes2aligned_downbeats(notes: pd.DataFrame) -> pd.DataFrame:
     beat_float = ms3.transform(
         notes,
         onset2beat,
@@ -148,17 +149,32 @@ def aligned_notes2aligned_downbeats(aligned_notes: str):
     return notes.loc[downbeat_mask, keep_columns].drop_duplicates(subset=["mn_playthrough", "beat"])
 
 
-def aligned_notes2tilia_format(aligned_notes: str):
-    aligned_beats = aligned_notes2aligned_downbeats(aligned_notes)
+def aligned_beats2tilia_format(aligned_beats):
     measure = aligned_beats.mn_playthrough.str.extract("^(\d+)", expand=False).astype("Int64")
-    result = pd.DataFrame(dict(
-        time = aligned_beats.start,
-        is_first_in_measure = (aligned_beats.beat == 1),
-        measure = measure
-    )).reset_index(drop=True)
+    result = pd.DataFrame(
+        dict(
+            time=aligned_beats.start,
+            is_first_in_measure=(aligned_beats.beat == 1),
+            measure=measure
+        )
+    ).reset_index(drop=True)
     return result
 
 
+def aligned_notes2tilia_format(notes):
+    aligned_beats = aligned_notes2aligned_downbeats(notes)
+    return aligned_beats2tilia_format(aligned_beats)
+
+
+def aligned_notes_tsv2aligned_downbeats(aligned_notes_tsv: str) -> pd.DataFrame:
+    """Not used, kept for completeness."""
+    notes = ms3.load_tsv(aligned_notes_tsv)
+    return aligned_notes2aligned_downbeats(notes)
+
+
+def aligned_notes_tsv2tilia_format(aligned_notes_tsv: str) -> pd.DataFrame:
+    notes = ms3.load_tsv(aligned_notes_tsv)
+    return aligned_notes2tilia_format(notes)
 
 
 
@@ -168,7 +184,7 @@ def main(
         preview=False
 ):
     try:
-        df = aligned_notes2tilia_format(aligned_notes)
+        df = aligned_notes_tsv2tilia_format(aligned_notes)
     except (AttributeError, KeyError) as e:
         print(f"Converting {aligned_notes!r} to tilia format failed with error {e!r}.")
         return
