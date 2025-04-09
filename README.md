@@ -1,4 +1,4 @@
-# Aligning audio to annotated score labels from the Annotated Mozart Sonatas dataset
+# Aligning notes and annotations with audio recordings
 
 https://user-images.githubusercontent.com/44549540/203167688-d05adbcc-157a-44eb-aad0-c29ebd6be631.mp4
 
@@ -11,6 +11,30 @@ _Bottom_: original score added to follow the music and the annotations precise l
 (higher quality to see the labels names more clearly: ![here](images/live_viz_K309-2.mp4))
 
 See the project's presentation ![here](https://github.com/clelf/Aligning-audio-to-annotated-score-labels/blob/main/Presentation_alignment_project.pdf)
+
+<!-- TOC -->
+
+* [Aligning notes and annotations with audio recordings](#aligning-notes-and-annotations-with-audio-recordings)
+    * [Intro](#intro)
+    * [Content](#content)
+    * [Prerequisites](#prerequisites)
+        * [Package requirements](#package-requirements)
+        * [First-time setup](#first-time-setup)
+        * [Dataset preparation](#dataset-preparation)
+    * [Tutorial](#tutorial)
+        * [Command line](#command-line)
+        * [Playground notebook](#playground-notebook)
+        * [Results visualization](#results-visualization)
+            * [Visualize labels alignment](#visualize-labels-alignment)
+            * [Visualize notes (score following-like mode) [to be added]](#visualize-notes-score-following-like-mode-to-be-added)
+    * [Deriving timelines from aligned notes](#deriving-timelines-from-aligned-notes)
+        * [Prepare the data](#prepare-the-data)
+        * [Align notes with recording and derive timeline(s)](#align-notes-with-recording-and-derive-timelines)
+        * [Create a TiLiA file](#create-a-tilia-file)
+    * [Notes and leads of improvement](#notes-and-leads-of-improvement)
+    * [References](#references)
+
+<!-- TOC -->
 
 ## Intro
 
@@ -30,17 +54,17 @@ The project was conducted at the Digital and Cognitive Musicology Lab at EPFL le
 ## Prerequisites
 ### Package requirements
 
-Currently this repository is running with:
-- python 3.9.7
-- libfmp 1.2.2
-- librosa 0.9.1
-- numpy 1.22.2
-- pandas 1.4.2
-- scipy 1.8.0
-- synctoolbox 1.2.0
-- ms3 0.5.2
+Check the `requirements.txt`.
 
-Install synctoolbox via the recommended procedure [here](https://github.com/meinardmueller/synctoolbox).
+### First-time setup
+
+* clone this repo
+* (optional but recommended) create and activate a new environment
+    * e.g. a conda environment: `conda create -n ms3 python=3.10 && conda activate ms3`
+* install the requirements: `pip install -r requirements.txt`
+
+> [!IMPORTANT]
+> Remember to activate the correct environment before executing any of the commands below.
 
 ### Dataset preparation
 
@@ -93,7 +117,76 @@ For labels visualization purposes, only the `compact` mode is needed when runnin
 
 #### Visualize notes (score following-like mode) [to be added]
 
+## Deriving timelines from aligned notes
 
+This section explains how to generate a `.tilia.csv` file that can be imported into TiLiA,
+the [Timeline Annotator](https://tilia-app.com/) software.
+
+What you need:
+
+* have followed the [first-time setup](#first-time-setup) above
+* a MuseScore file of the piece in question
+* an audio recording, possibly one in the public domain so that it can be shared
+    * first stop: [IMSLP](https://imslp.org/)
+    * [Creative Commons Search](https://search.creativecommons.org/)
+    * [MusOpen](https://musopen.org/) (requires log-in)
+    * [archive.org](https://archive.org/)
+    * [Musical Heritage Organization](https://pool.musicalheritage.org)
+
+### Prepare the data
+
+We need to extract an unfolded notes TSV from the MuseScore file, which we can achieve with ms3:
+
+    ms3 extract -a -N <target> -u -i <regEx>
+
+* `-a` stands for all (without this flag, ms3 will ignore all files that are not listed in a
+  `metadata.tsv` file)
+* `-N`, optionally followed by the target directory where to store the notes TSV file(s)
+* `-u` stands for unfolded, i.e., with expanded repeats
+* `-i` for including only files that match the regular expression; leave out to process all
+  MuseScore files in the current directory and all subdirectories
+
+Problems will arise if the recordings do not reflect the repeat structure of your score (e.g.,
+a musician does not actually repeat a section that is repeated in the score). The easiest way to
+address a mismatch might be to manipulate the MuseScore file until it reflects the recording's
+music flow before extraction.
+
+If you want to batch process multiple pieces, you need to create a CSV file mapping notes TSV files to audio files. The
+column names are (order irrelevant):
+
+* `audio`: path to an audio file
+* `notes`: path to a notes TSV file
+* `name`: (optional) name of the output file(s). Column can be missing or have values for only some of the pieces.
+
+You can either store absolute paths or relative paths that resolve correctly against your current working directory at
+processing time.
+
+### Align notes with recording and derive timeline(s)
+
+You're now set up to create one `.tilia.csv` file per piece that you can import in TiLiA as a beat
+timeline. The command is:
+
+    python aligner.py -a audio.mp3 -n piece_unfolded.notes.tsv -tla
+
+* `-a` is the (absolute or relative) path to the audio file
+* `-n` is the (absolute or relative) path to the notes TSV file
+* `-tla` tells the script to create a `.tilia.csv` file
+* optionally, you can pass `-o <target>` to choose where to create the file(s)
+
+If you are batch processing multiple files, replace the arguments `-a` and `-n` with
+`-c batch.csv`, specifying the (absolute or relative) path to the mapping CSV file
+(see previous section), e.g.:
+
+    python aligner.py -c batch.csv -tla
+
+### Create a TiLiA file
+
+* in an empty file
+* load the audio recording
+* create a beat grid with an arbitrary beat pattern (e.g. `4`) -- (this step will not be necessary in the future)
+* follow the [TiLiA documentation](https://tilia-app.com/help/import) to import the corresponding
+  `.tilia.csv` file as a beat timeline.
+* save the file
 
 ## Notes and leads of improvement
 
