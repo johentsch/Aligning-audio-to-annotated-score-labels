@@ -7,7 +7,7 @@ import ms3.cli
 import pandas as pd
 from tqdm.auto import tqdm
 
-from make_timeline import aligned_notes2aligned_downbeats, aligned_beats2tilia_format, aligned_notes2tilia_format
+from make_timeline import aligned_notes2timeline, aligned_beats2tilia_format, aligned_notes2tilia_format
 from utils import align_notes_labels_audio, store_and_report_result
 
 
@@ -115,7 +115,7 @@ def align_and_maybe_timeline(
         if not store_path:
             store_path = os.getcwd()
     if timeline:
-        timeline = aligned_notes2aligned_downbeats(aligned_notes)
+        timeline = aligned_notes2timeline(aligned_notes)
         store_and_report_result(timeline, store_path, original_path, ".timeline.csv", "timeline")
         if tilia:
             tilia_format = aligned_beats2tilia_format(timeline)

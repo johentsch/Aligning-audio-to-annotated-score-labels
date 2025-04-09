@@ -30,6 +30,7 @@ from functools import cache
 from typing import Optional, Literal, overload
 
 import ms3
+import numpy as np
 import pandas as pd
 
 
@@ -87,12 +88,12 @@ def ts_beat_size(ts: str) -> Fraction:
 
 @overload
 def onset2beat(
-    onset: Fraction, timesig: str, beat_decimals: Literal[None]
+        onset: Fraction, timesig: str, beat_decimals: Literal[None], first_beat: float | int
 ) -> Fraction: ...
 
 
 @overload
-def onset2beat(onset: Fraction, timesig: str, beat_decimals: int) -> float: ...
+def onset2beat(onset: Fraction, timesig: str, beat_decimals: int, first_beat: float | int) -> float: ...
 
 
 
@@ -130,7 +131,40 @@ def float_is_integer(f: float) -> bool:
         return False
 
 
-def aligned_notes2aligned_downbeats(notes: pd.DataFrame) -> pd.DataFrame:
+def timesig2n_beats(timesig: "str") -> int:
+    timesig_frac = Fraction(timesig)
+    result = float(onset2beat(timesig_frac, timesig, first_beat=0))
+    if not result.is_integer():
+        raise ValueError(f"Timesig {timesig!r} resulted in a non-integer number of beats: {result}")
+    return int(result)
+
+
+def interpolate_missing_beats(tl: pd.DataFrame):
+    mn_column = "mn_playthrough" if "mn_playthrough" in tl.columns else "mn"
+    gpb = tl.groupby(mn_column)
+    if ((n_timesigs := gpb.timesig.nunique()) > 1).any():
+        faulty = n_timesigs[n_timesigs > 1]
+        raise ValueError(f"Multiple timesigs found:\n{faulty}")
+    mn2timesig = gpb.timesig.unique().map(lambda x: x[0])
+    mn2n_beats_timesig = mn2timesig.map(timesig2n_beats)
+    mn2present_beats = gpb.beat.unique().map(set)
+    mn2n_present_beats = mn2present_beats.map(len)
+    mn2max_present_beat = mn2present_beats.map(max)
+    mn2n_expected_beats = np.maximum(mn2n_beats_timesig, mn2max_present_beat).rename("beats")
+    mn2n_missing_beats = mn2n_expected_beats - mn2n_present_beats
+    to_be_corrected_mask = mn2n_missing_beats > 0
+    if not to_be_corrected_mask.any():
+        return tl
+    mn2complete_beatgrid = mn2n_expected_beats.map(lambda n: set(range(1, n + 1))).explode().rename(
+        "beat"
+        ).reset_index()
+    merge_columns = mn2complete_beatgrid.columns.tolist()
+    result = pd.merge(mn2complete_beatgrid, tl, how="left", on=merge_columns)
+    result.start = result.start.interpolate(method='linear')
+    return result
+
+
+def aligned_notes2timeline(notes: pd.DataFrame) -> pd.DataFrame:
     beat_float = ms3.transform(
         notes,
         onset2beat,
@@ -147,7 +181,8 @@ def aligned_notes2aligned_downbeats(notes: pd.DataFrame) -> pd.DataFrame:
     )
     keep_columns = [col for col in notes.columns if col not in drop_columns]
     mn_column = "mn_playthrough" if "mn_playthrough" in notes.columns else "mn"  # playthrough -> expanded repeats
-    return notes.loc[downbeat_mask, keep_columns].drop_duplicates(subset=[mn_column, "beat"])
+    result = notes.loc[downbeat_mask, keep_columns].drop_duplicates(subset=[mn_column, "beat"])
+    return interpolate_missing_beats(result)
 
 
 def aligned_beats2tilia_format(aligned_beats):
@@ -170,14 +205,14 @@ def aligned_beats2tilia_format(aligned_beats):
 
 
 def aligned_notes2tilia_format(notes):
-    aligned_beats = aligned_notes2aligned_downbeats(notes)
+    aligned_beats = aligned_notes2timeline(notes)
     return aligned_beats2tilia_format(aligned_beats)
 
 
-def aligned_notes_tsv2aligned_downbeats(aligned_notes_tsv: str) -> pd.DataFrame:
+def aligned_notes_tsv2timeline(aligned_notes_tsv: str) -> pd.DataFrame:
     """Not used, kept for completeness."""
     notes = ms3.load_tsv(aligned_notes_tsv)
-    return aligned_notes2aligned_downbeats(notes)
+    return aligned_notes2timeline(notes)
 
 
 def aligned_notes_tsv2tilia_format(aligned_notes_tsv: str) -> pd.DataFrame:
@@ -243,3 +278,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+
