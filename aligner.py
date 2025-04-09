@@ -62,19 +62,22 @@ def batch_process(
                 output_path = os.path.join(store_path, output_path)
         else:
             output_path = store_path
-        align_and_maybe_timeline(
-            audio_path=row.audio,
-            notes_path=row.notes,
-            labels_path=None if not has_labels else row.labels,
-            store=store,
-            store_path=output_path,
-            verbose=verbose,
-            visualize=visualize,
-            evaluate=evaluate,
-            mode=mode,
-            timeline=timeline,
-            tilia=tilia
-        )
+        try:
+            align_and_maybe_timeline(
+                audio_path=row.audio,
+                notes_path=row.notes,
+                labels_path=None if not has_labels else row.labels,
+                store=store,
+                store_path=output_path,
+                verbose=verbose,
+                visualize=visualize,
+                evaluate=evaluate,
+                mode=mode,
+                timeline=timeline,
+                tilia=tilia
+            )
+        except Exception as e:
+            print(f"An error occurred when processing {row.audio!r} and {row.notes!r}:\n{e!r}")
 
 
 def align_and_maybe_timeline(
@@ -109,6 +112,8 @@ def align_and_maybe_timeline(
     else:
         # store_path is a filepath and we will replace the suffix of the file
         store_path, original_path = os.path.split(store_path)
+        if not store_path:
+            store_path = os.getcwd()
     if timeline:
         timeline = aligned_notes2aligned_downbeats(aligned_notes)
         store_and_report_result(timeline, store_path, original_path, ".timeline.csv", "timeline")

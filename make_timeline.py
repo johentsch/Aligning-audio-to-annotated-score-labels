@@ -155,9 +155,13 @@ def aligned_beats2tilia_format(aligned_beats):
         measure = aligned_beats.mn_playthrough.str.extract("^(\d+)", expand=False).astype("Int64")
     else:
         measure = aligned_beats.mn
+
+    start = aligned_beats.start
+    if isinstance(start, pd.DataFrame):
+        raise ValueError("There are more than one 'start' columns, so I don't know which one to use.")
     result = pd.DataFrame(
         dict(
-            time=aligned_beats.start,
+            time=start,
             is_first_in_measure=(aligned_beats.beat == 1),
             measure=measure
         )
