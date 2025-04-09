@@ -520,10 +520,11 @@ def get_original_notes_warped(notes_path: str, df_annotation_warped: pd.DataFram
     notes_df = ms3.load_tsv(notes_path)
     if "start" in notes_df.columns:
         warnings.warn(
-            f"The notes TSV already came with a 'start' column, so the result has two of them. If you want to add "
-            f"alignments for several recordings to the same note tables, it is a good idea to rename the columns "
-            f"accordingly."
+            f"{notes_path!r} already came with a 'start' column, so I've left it as it was. If you want to add "
+            f"alignments for several recordings to the same note table, you will need to rename the column 'start' "
+            f"after creating it and before adding a new one."
         )
+        return notes_df
     assert notes_df.midi.equals(df_annotation_warped.pitch), "MIDI values do not match"
     result = pd.concat([notes_df, df_annotation_warped[['start', 'end']]], axis=1)
     return result
