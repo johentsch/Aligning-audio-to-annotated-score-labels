@@ -1,11 +1,8 @@
 import os
 import re
-from pprint import pprint
-from typing import Literal, Optional, Iterable
+from typing import Literal, Optional
 
 import pandas as pd
-
-from utils import align_notes_labels_audio
 
 
 def resolve_dir(d):
@@ -72,20 +69,24 @@ def main(
     if output_folder:
         output_folder = resolve_dir(output_folder)
     mapping = make_file_mapping(audio_path, notes_path)
-    for row in mapping.itertuples():
-        audio_filepath = os.path.join(audio_path, row.audio_filename)
-        notes_filepath = os.path.join(notes_path, row.notes_filename)
-        align_notes_labels_audio(
-            audio_path=audio_filepath,
-            notes_path=notes_filepath,
-            labels_path=None,
-            store=True,
-            store_path=output_folder if output_folder else notes_filepath,
-            verbose=True,
-            visualize=False,
-            evaluate=False,
-            mode=mode
-        )
+    mapping.audio_filename = mapping.audio_filename.apply(lambda x: os.path.join(audio_path, x))
+    mapping.notes_filename = mapping.notes_filename.apply(lambda x: os.path.join(notes_path, x))
+    mapping = mapping.rename(columns=dict(audio_filename="audio", notes_filename="notes")).reset_index(names="name")
+    mapping.to_csv("bach_batch.csv", index=False)
+    # for row in mapping.itertuples():
+    #     audio_filepath = os.path.join(audio_path, row.audio_filename)
+    #     notes_filepath = os.path.join(notes_path, row.notes_filename)
+    #     align_notes_labels_audio(
+    #         audio_path=audio_filepath,
+    #         notes_path=notes_filepath,
+    #         labels_path=None,
+    #         store=True,
+    #         store_path=output_folder if output_folder else notes_filepath,
+    #         verbose=True,
+    #         visualize=False,
+    #         evaluate=False,
+    #         mode=mode
+    #     )
 
 
 def run():
