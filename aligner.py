@@ -119,11 +119,10 @@ def align_and_maybe_timeline(
         store_and_report_result(timeline, store_path, original_path, ".timeline.csv", "timeline")
         if tilia:
             tilia_format = aligned_beats2tilia_format(timeline)
-        else:
-            return  # make sure we get to the bottom only if tilia
-    if tilia:
+    elif tilia:
         tilia_format = aligned_notes2tilia_format(aligned_notes)
-    store_and_report_result(tilia_format, store_path, original_path, ".tilia.csv", "tilia format")
+    if tilia:
+        store_and_report_result(tilia_format, store_path, original_path, ".tilia.csv", "tilia format")
 
 
 def main(

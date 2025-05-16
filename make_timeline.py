@@ -186,7 +186,7 @@ def aligned_notes2timeline(notes: pd.DataFrame) -> pd.DataFrame:
     return interpolate_missing_beats(result)
 
 
-def aligned_beats2tilia_format(aligned_beats):
+def aligned_beats2tilia_format(aligned_beats, minimal_column_set=False):
     if "mn_playthrough" in aligned_beats.columns:
         measure = aligned_beats.mn_playthrough.str.extract("^(\d+)", expand=False).astype("Int64")
     else:
@@ -195,14 +195,19 @@ def aligned_beats2tilia_format(aligned_beats):
     start = aligned_beats.start
     if isinstance(start, pd.DataFrame):
         raise ValueError("There are more than one 'start' columns, so I don't know which one to use.")
+    data = dict(
+        time=start,
+        measure=measure,
+        is_first_in_measure=(aligned_beats.beat == 1)
+    )
+    if not minimal_column_set:
+        data["beat"] = aligned_beats.beat
+        if "mn_playthrough" in aligned_beats.columns:
+            data["mn_playthrough"] = aligned_beats.mn_playthrough
     result = pd.DataFrame(
-        dict(
-            time=start,
-            is_first_in_measure=(aligned_beats.beat == 1),
-            measure=measure
-        )
+        data
     ).reset_index(drop=True)
-    return result
+    return result.sort_values("time")
 
 
 def aligned_notes2tilia_format(notes):
