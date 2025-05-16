@@ -141,7 +141,8 @@ def timesig2n_beats(timesig: "str") -> int:
 
 def interpolate_missing_beats(tl: pd.DataFrame):
     mn_column = "mn_playthrough" if "mn_playthrough" in tl.columns else "mn"
-    gpb = tl.groupby(mn_column)
+    gpb = tl.groupby(mn_column, sort=False) # this is important for mn_playthrough which are strings that would get
+    # sorted lexigraphically, giving wrong results. It is therefore important that the timeline comes correctly sorted
     if ((n_timesigs := gpb.timesig.nunique()) > 1).any():
         faulty = n_timesigs[n_timesigs > 1]
         raise ValueError(f"Multiple timesigs found:\n{faulty}")
