@@ -152,13 +152,21 @@ def interpolate_missing_beats(tl: pd.DataFrame):
     mn2n_present_beats = mn2present_beats.map(len)
     mn2max_present_beat = mn2present_beats.map(max)
     mn2n_expected_beats = np.maximum(mn2n_beats_timesig, mn2max_present_beat).rename("beats")
+    if mn_column == "mn":
+        # do not fill anacrusis measure 0
+        anacrusis_mask =  mn2n_expected_beats.index == 0
+    else:
+        # do not fill anacrusis measure (such as "0a", "0b", etc.)
+        anacrusis_mask = mn2n_expected_beats.index.str.startswith("0")
+    if anacrusis_mask.any():
+        mn2n_expected_beats[anacrusis_mask] = 0
     mn2n_missing_beats = mn2n_expected_beats - mn2n_present_beats
     to_be_corrected_mask = mn2n_missing_beats > 0
     if not to_be_corrected_mask.any():
         return tl
     mn2complete_beatgrid = mn2n_expected_beats.map(lambda n: set(range(1, n + 1))).explode().rename(
         "beat"
-        ).reset_index()
+        ).reset_index() # df with columns <mn_column> and "beat"
     merge_columns = mn2complete_beatgrid.columns.tolist()
     result = pd.merge(mn2complete_beatgrid, tl, how="left", on=merge_columns)
     result.start = result.start.interpolate(method='linear')
