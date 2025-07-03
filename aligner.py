@@ -7,7 +7,8 @@ import ms3.cli
 import pandas as pd
 from tqdm.auto import tqdm
 
-from make_timeline import aligned_notes2timeline, aligned_beats2tilia_format, aligned_notes2tilia_format
+from make_timeline import aligned_notes2timeline, aligned_beats2tilia_format, aligned_notes2tilia_format, \
+    aligned_notes2qb_warp_map
 from utils import align_notes_labels_audio, store_and_report_result
 
 
@@ -21,6 +22,7 @@ def batch_process(
         mode: Literal['compact', 'labels', 'extended'] = 'compact',
         timeline: bool = False,
         tilia: bool = False,
+        warp_map: bool = False
 ):
     """
 
@@ -78,7 +80,8 @@ def batch_process(
                 evaluate=evaluate,
                 mode=mode,
                 timeline=timeline,
-                tilia=tilia
+                tilia=tilia,
+                warp_map=warp_map
             )
         except Exception as e:
             print(f"An error occurred when processing {audio_path !r} and {notes_path !r}:\n{e!r}")
@@ -96,6 +99,7 @@ def align_and_maybe_timeline(
         mode: Literal['compact', 'labels', 'extended'] = 'compact',
         timeline: bool = False,
         tilia: bool = False,
+        warp_map: bool = False
 ):
     aligned_notes, _ = align_notes_labels_audio(
         audio_path=audio_path,
@@ -108,7 +112,7 @@ def align_and_maybe_timeline(
         evaluate=evaluate,
         mode=mode,
     )
-    if timeline + tilia == 0: return
+    if timeline + tilia + warp_map == 0: return
     if not store_path:
         store_path = os.getcwd()
     if os.path.isdir(store_path):
@@ -125,8 +129,13 @@ def align_and_maybe_timeline(
             tilia_format = aligned_beats2tilia_format(timeline)
     elif tilia:
         tilia_format = aligned_notes2tilia_format(aligned_notes)
+
     if tilia:
         store_and_report_result(tilia_format, store_path, original_path, ".tilia.csv", "tilia format")
+
+    if warp_map:
+        warp_map_values = aligned_notes2qb_warp_map(aligned_notes)
+        store_and_report_result(warp_map_values, store_path, original_path, ".quarters2seconds.csv", "warp map")
 
 
 def main(
@@ -142,6 +151,7 @@ def main(
         mode: Literal['compact', 'labels', 'extended'] = 'compact',
         timeline: bool = False,
         tilia: bool = False,
+        warp_map: bool = False
 ):
     if csv_path:
         batch_process(
@@ -153,7 +163,8 @@ def main(
             evaluate=evaluate,
             mode=mode,
             timeline=timeline,
-            tilia=tilia
+            tilia=tilia,
+            warp_map=warp_map
         )
     else:
         align_and_maybe_timeline(
@@ -167,7 +178,8 @@ def main(
             evaluate=evaluate,
             mode=mode,
             timeline=timeline,
-            tilia=tilia
+            tilia=tilia,
+            warp_map=warp_map
         )
 
 
@@ -239,6 +251,9 @@ def parse_args():
     parser.add_argument(
         '-tla', '--tilia', help="Output an additional .tilia.csv file. default: False", action='store_true'
     )
+    parser.add_argument(
+        "-w", "--warp_map", help="Output a .quarters2seconds.csv file for future transfer. default: False", action='store_true'
+    )
     args = parser.parse_args()
     if args.csv:
         if args.output:
@@ -268,7 +283,8 @@ def run():
         evaluate=args.evaluate,
         mode=args.mode,
         timeline=args.timeline,
-        tilia=args.tilia
+        tilia=args.tilia,
+        warp_map=args.warp_map
     )
 
 if __name__ == '__main__':

@@ -33,6 +33,8 @@ import ms3
 import numpy as np
 import pandas as pd
 
+from utils import get_quarterbeats_column_name
+
 
 def resolve_dir(d):
     """Resolves '~' to HOME directory and turns ``d`` into an absolute path.
@@ -222,6 +224,20 @@ def aligned_notes2tilia_format(notes):
     aligned_beats = aligned_notes2timeline(notes)
     return aligned_beats2tilia_format(aligned_beats)
 
+def aligned_notes2qb_warp_map(aligned_notes):
+    qb_column = get_quarterbeats_column_name(aligned_notes) # qb_playthrough => expanded repeats
+    start_instants = aligned_notes.set_index(qb_column).start
+    end_instants = aligned_notes.end.copy()
+    end_instants.index = aligned_notes[qb_column] + (aligned_notes.duration * 4)
+    unique_start_instants = start_instants[~start_instants.index.duplicated(keep='first')]
+    unique_end_instants = end_instants[~end_instants.index.duplicated(keep='first')]
+    only_in_ends = unique_end_instants.index.difference(unique_start_instants.index)
+    if len(only_in_ends) == 0:
+        warp_map_values = unique_start_instants  # will be copied upon renaming
+    else:
+        warp_map_values = pd.concat([unique_start_instants, unique_end_instants.loc[only_in_ends]])
+    warp_map_values = warp_map_values.sort_index().reset_index().set_axis([qb_column, "seconds"], axis=1)
+    return warp_map_values
 
 def aligned_notes_tsv2timeline(aligned_notes_tsv: str) -> pd.DataFrame:
     """Not used, kept for completeness."""
