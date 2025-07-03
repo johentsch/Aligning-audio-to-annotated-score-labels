@@ -62,11 +62,15 @@ def batch_process(
                 output_path = os.path.join(store_path, output_path)
         else:
             output_path = store_path
+        output_path = os.path.abspath(output_path)
+        audio_path = os.path.abspath(row.audio)
+        notes_path = os.path.abspath(row.notes)
+        labels_path = None if not has_labels else row.labels
         try:
             align_and_maybe_timeline(
-                audio_path=row.audio,
-                notes_path=row.notes,
-                labels_path=None if not has_labels else row.labels,
+                audio_path=audio_path,
+                notes_path=notes_path,
+                labels_path=labels_path,
                 store=store,
                 store_path=output_path,
                 verbose=verbose,
@@ -77,7 +81,7 @@ def batch_process(
                 tilia=tilia
             )
         except Exception as e:
-            print(f"An error occurred when processing {row.audio!r} and {row.notes!r}:\n{e!r}")
+            print(f"An error occurred when processing {audio_path !r} and {notes_path !r}:\n{e!r}")
 
 
 def align_and_maybe_timeline(
