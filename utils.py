@@ -136,7 +136,12 @@ Labels: {labels_qb_column!r}"""
     
     return notes_extended
 
-def align_warped_notes_labels(df_annotation_warped, notes_labels_extended, mode='compact'):
+def align_warped_notes_labels(
+        df_annotation_warped,
+        notes_labels_extended,
+        last_end: float,
+        mode='compact',
+):
     """
     After warping path is computed and synchronization of notes dataframe with audio is performed,
     align the labels based using notes index as a key. 
@@ -197,7 +202,7 @@ def align_warped_notes_labels(df_annotation_warped, notes_labels_extended, mode=
                     'pitch'
                 ]
             ).rename(
-                columns={'duration': 'duration_time'}
+                columns={'duration': 'duration_seconds'}
             ),
             right=notes_labels_extended.drop(columns=drop_cols),
             how="outer",
@@ -228,10 +233,16 @@ def align_warped_notes_labels(df_annotation_warped, notes_labels_extended, mode=
 
     else:
         raise ValueError(f"'mode' parameter should bei either 'compact', 'labels' or 'extended', got {mode}")
-    
-    aligned_timestamps_labels = aligned_timestamps_labels.rename(columns={'start':'timestamp'})
+
+    update_duration_and_end_from_start(aligned_timestamps_labels, last_end)
+    # aligned_timestamps_labels = aligned_timestamps_labels.rename(columns={'start':'timestamp'})
     
     return aligned_timestamps_labels
+
+
+def update_duration_and_end_from_start(aligned_timestamps_labels, last_end):
+    aligned_timestamps_labels.end = aligned_timestamps_labels.start.shift(-1).fillna(last_end)
+    aligned_timestamps_labels.duration_seconds = aligned_timestamps_labels.end - aligned_timestamps_labels.start
 
 
 def get_features_from_audio(audio, tuning_offset, Fs, feature_rate, visualize=False):
@@ -378,7 +389,7 @@ def align_notes_labels_audio(
         visualize: bool = False,
         evaluate: bool = False,
         mode: Literal['compact', 'labels', 'extended'] = 'compact'
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, float]:
     """This function performs the whole pipeline of aligning an audio recording of a piece and its
     corresponding labels annotations from DCML's Mozart sonatas corpus [1], using synctoolbox dynamic
     time warping (DTW) tools [2]. It takes as input the paths to the audio file, to the labels TSV file
@@ -455,6 +466,7 @@ def align_notes_labels_audio(
     
     # Load audio
     audio, _ = librosa.load(audio_path, sr=Fs)
+    audio_duration = librosa.get_duration(y=audio, sr=Fs)
 
     # Estimate tuning deviation
     tuning_offset = estimate_tuning(audio, Fs)
@@ -501,7 +513,12 @@ def align_notes_labels_audio(
 
     aligned_notes = get_original_notes_warped(notes_path, df_annotation_warped)
     if df_annotation_extended is not None:  # there are labels to be aligned
-        result = align_warped_notes_labels(df_annotation_warped, df_annotation_extended, mode)
+        result = align_warped_notes_labels(
+            df_annotation_warped,
+            df_annotation_extended,
+            last_end=audio_duration,
+            mode=mode
+        )
     elif mode == 'compact':
         result = df_annotation_warped[['start', 'end', 'pitch']]
     elif mode == 'extended':
@@ -513,7 +530,7 @@ def align_notes_labels_audio(
     # Store
     if store:
         store_and_report_result(result, store_path, audio_path, "_aligned.csv", "alignment result")
-    return aligned_notes, result
+    return aligned_notes, result, audio_duration
 
 
 def get_original_notes_warped(notes_path: str, df_annotation_warped: pd.DataFrame) -> pd.DataFrame:

@@ -101,7 +101,7 @@ def align_and_maybe_timeline(
         tilia: bool = False,
         warp_map: bool = False
 ):
-    aligned_notes, _ = align_notes_labels_audio(
+    aligned_notes, _, duration = align_notes_labels_audio(
         audio_path=audio_path,
         notes_path=notes_path,
         labels_path=labels_path,
