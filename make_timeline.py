@@ -27,7 +27,7 @@ import argparse
 import os
 from fractions import Fraction
 from functools import cache
-from typing import Optional, Literal, overload
+from typing import Optional, Literal, overload, Any
 
 import ms3
 import numpy as np
@@ -220,7 +220,7 @@ def aligned_beats2tilia_format(aligned_beats, minimal_column_set=False):
     return result.sort_values("time")
 
 
-def aligned_notes2tilia_format(notes):
+def aligned_notes2tilia_beatgrid(notes):
     aligned_beats = aligned_notes2timeline(notes)
     return aligned_beats2tilia_format(aligned_beats)
 
@@ -247,8 +247,99 @@ def aligned_notes_tsv2timeline(aligned_notes_tsv: str) -> pd.DataFrame:
 
 def aligned_notes_tsv2tilia_format(aligned_notes_tsv: str) -> pd.DataFrame:
     notes = ms3.load_tsv(aligned_notes_tsv)
-    return aligned_notes2tilia_format(notes)
+    return aligned_notes2tilia_beatgrid(notes)
 
+
+def make_adjacency_mask(
+    S: pd.Series,
+) -> pd.Series:
+    """Copied from dimcat v3.3.0
+    Turns a Series into a Boolean Series that is True for the first value of each group of successive equal
+    values.
+    """
+    assert not S.isna().any(), "Series must not contain NA values."
+    beginnings = (S != S.shift()).fillna(True)
+    return beginnings
+
+def make_adjacency_groups(
+    S: pd.Series,
+    groupby=None,
+) -> tuple[pd.Series, dict[int, Any]]:
+    """Copied from dimcat v3.3.0
+    Turns a Series into a Series of ascending integers starting from 1 that reflect groups of successive
+    equal values.
+
+    This is a simplified variant of ms3.adjacency_groups()
+
+    Args:
+      S: Series in which to group identical adjacent values with each other.
+      groupby:
+        If not None, the resulting grouper will start new adjacency groups according to this groupby.
+        This is a way, for example, to ensure no group overlaps piece boundaries even if there are
+        adjacent identical values.
+
+    Returns:
+      A series with increasing integers that can be used for grouping.
+      A dictionary mapping the integers to the grouped values.
+
+    """
+    if groupby is None:
+        beginnings = make_adjacency_mask(S)
+    else:
+        beginnings = S.groupby(groupby, group_keys=False).apply(make_adjacency_mask)
+    groups = beginnings.cumsum()
+    names = dict(enumerate(S[beginnings], 1))
+    try:
+        return pd.to_numeric(groups).astype("Int64"), names
+    except TypeError:
+        logger.warning(f"Erroneous outcome while computing adjacency groups: {groups}")
+        return groups, names
+
+def condense_dataframe_by_groups(
+    df: pd.DataFrame,
+    group_keys_series: pd.Series,
+):
+    """Copied from dimcat v3.3.0
+    Based on the given ``group_keys_series``, drop all rows but the first of each group and adapt the column
+    'duration_qb' accordingly.
+
+
+    Args:
+        df:
+            DataFrame to be reduced, expected to contain the column ``duration_qb``. In order to use the result as a
+            segmentation, it should have a :obj:`pandas.IntervalIndex`.
+        group_keys_series:
+            Series with the same index as ``df`` that contains the group keys. If it contains NA values, the
+
+
+    Returns:
+        Reduced DataFrame with updated 'duration_qb' column and :obj:`pandas.IntervalIndex` on the first level
+        (if present).
+
+    """
+    if "duration_qb" not in df.columns:
+        raise ValueError(f"DataFrame is missing the column 'duration_qb': {df.columns}")
+    missing_duration_mask = df.duration_qb.isna()
+    if missing_duration_mask.any():
+        if missing_duration_mask.all():
+            raise ValueError(
+                "DataFrame contains only NA values in column 'duration_qb'."
+            )
+        logger.warning(
+            f"DataFrame contains {missing_duration_mask.sum()} NA values in column 'duration_qb'. "
+            f"Those rows will be dropped."
+        )
+        df = df[~missing_duration_mask]
+        group_keys_series = group_keys_series[~missing_duration_mask]
+    if group_keys_series.isna().any():
+        logger.warning(
+            f"The group_keys_series contains {group_keys_series.isna().sum()} NA values. The corresponding rows will "
+            f"be dropped."
+        )
+    condensed = df.groupby(group_keys_series, group_keys=False).apply(
+        ms3.reduce_dataframe_duration_to_first_row
+    )
+    return condensed
 
 
 def main(

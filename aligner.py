@@ -7,9 +7,9 @@ import ms3.cli
 import pandas as pd
 from tqdm.auto import tqdm
 
-from make_timeline import aligned_notes2timeline, aligned_beats2tilia_format, aligned_notes2tilia_format, \
-    aligned_notes2qb_warp_map
-from utils import align_notes_labels_audio, store_and_report_result
+from make_timeline import aligned_notes2timeline, aligned_beats2tilia_format, aligned_notes2tilia_beatgrid, \
+    aligned_notes2qb_warp_map, make_adjacency_groups, condense_dataframe_by_groups
+from utils import align_notes_labels_audio, store_and_report_result, update_duration_and_end_from_start
 
 
 def batch_process(
@@ -101,7 +101,7 @@ def align_and_maybe_timeline(
         tilia: bool = False,
         warp_map: bool = False
 ):
-    aligned_notes, _, duration = align_notes_labels_audio(
+    aligned_notes, aligned_harmonies, duration = align_notes_labels_audio(
         audio_path=audio_path,
         notes_path=notes_path,
         labels_path=labels_path,
@@ -126,16 +126,45 @@ def align_and_maybe_timeline(
         timeline = aligned_notes2timeline(aligned_notes)
         store_and_report_result(timeline, store_path, original_path, ".timeline.csv", "timeline")
         if tilia:
-            tilia_format = aligned_beats2tilia_format(timeline)
+            tilia_beatgrid = aligned_beats2tilia_format(timeline)
     elif tilia:
-        tilia_format = aligned_notes2tilia_format(aligned_notes)
+        tilia_beatgrid = aligned_notes2tilia_beatgrid(aligned_notes)
+
+
 
     if tilia:
-        store_and_report_result(tilia_format, store_path, original_path, ".tilia.csv", "tilia format")
+        store_and_report_result(tilia_beatgrid, store_path, original_path, ".beatgrid.csv", "TiLiA beatgrid")
+        if labels_path is not None:
+            tilia_keys = aligned_harmonies2tilia_keys(aligned_harmonies)
+            store_and_report_result(tilia_keys, store_path, original_path, ".keys.csv", "TiLiA keys")
+            cadence_mask = aligned_harmonies.cadence.notna()
+            if cadence_mask.sum() > 0:
+                tilia_cadences = aligned_harmonies.loc[cadence_mask].rename(columns=dict(
+                    start="time",
+                    cadence="label"
+                ))
+                store_and_report_result(tilia_cadences, store_path, original_path, ".cadences.csv", "TiLiA cadences")
 
     if warp_map:
         warp_map_values = aligned_notes2qb_warp_map(aligned_notes)
         store_and_report_result(warp_map_values, store_path, original_path, ".quarters2seconds.csv", "warp map")
+
+
+def aligned_harmonies2tilia_keys(aligned_harmonies):
+    group_keys, _ = make_adjacency_groups(aligned_harmonies.localkey)
+    localkeys = condense_dataframe_by_groups(
+        aligned_harmonies, group_keys
+    )
+    update_duration_and_end_from_start(localkeys, last_end=aligned_harmonies.end.max())
+    tilia_keys = localkeys.rename(
+        columns=dict(
+            label="annotation_label",
+            localkey="label",
+        )
+    )
+    tilia_keys["level"] = 1
+    tilia_keys["color"] = "#A78BFA"
+    return tilia_keys
 
 
 def main(
